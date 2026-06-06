@@ -1,0 +1,42 @@
+# Datos y modelos
+data/*
+!data/.gitkeep
+models/
+*.csv
+*.parquet
+*.h5
+*.pkl
+*.pt
+*.pth
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Entornos virtuales (por si alguien trabaja en local también)
+.venv/
+venv/
+env/
+
+# Secretos
+.env
+*.key
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# SO
+.DS_Store
+Thumbs.db

@@ -1,0 +1,29 @@
+# === Núcleo numérico ===
+numpy~=2.1
+pandas~=2.2
+scipy~=1.14
+
+# === Visualización ===
+matplotlib~=3.9
+seaborn~=0.13
+plotly~=5.24
+
+# === ML clásico ===
+scikit-learn~=1.5
+xgboost~=2.1
+lightgbm~=4.5
+statsmodels~=0.14
+
+# === Deep Learning (CPU) ===
+# torch se instala desde el índice CPU vía postCreateCommand del devcontainer
+# Descomenta la siguiente línea si el equipo decide usar TensorFlow también
+# tensorflow-cpu~=2.18
+
+# === Jupyter (kernel; la UI viene en VS Code vía extensiones) ===
+ipykernel~=6.29
+ipywidgets~=8.1
+
+# === Utilidades ===
+tqdm~=4.66
+joblib~=1.4
+python-dotenv~=1.0
