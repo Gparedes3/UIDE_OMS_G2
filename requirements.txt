@@ -14,9 +14,6 @@ xgboost~=2.1
 lightgbm~=4.5
 statsmodels~=0.14
 
-# === Interpretabilidad ===
-shap~=0.46
-
 # === Deep Learning (CPU) ===
 # torch se instala desde el índice CPU vía postCreateCommand del devcontainer
 # Descomenta la siguiente línea si el equipo decide usar TensorFlow también
@@ -31,6 +28,7 @@ tqdm~=4.66
 joblib~=1.4
 python-dotenv~=1.0
 
-# === API y datos (Banco Mundial + Parquet) ===
+# === API ===
 wbgapi==1.0.12
-pyarrow~=17.0
+pyarrow
+shap
