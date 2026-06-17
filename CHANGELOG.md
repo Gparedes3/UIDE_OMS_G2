@@ -3,17 +3,24 @@
 Registro de ramas, PRs y merges para trazabilidad del proyecto.
 Formato de commits: [Conventional Commits](https://www.conventionalcommits.org/).
 
-## [En progreso] — Punto 4: Validación metodológica
+## [En progreso] — Punto 5: Optimización avanzada
 
-### Rama `feature/04-validacion-metodologica` (PR pendiente → `main`)
-Objetivo: crear `04_validacion_metodologica.ipynb` con la celda de verificación de integración del
-pipeline y el análisis de los tres problemas metodológicos (alcance del Gini, *ground truth*,
-outliers por tipo).
+### Rama `feature/05-optimizacion-avanzada` (PR pendiente → `main`)
+Objetivo: recuperar el notebook de optimización de la rama `machine-learning`, sanearlo y dejarlo
+autocontenido como `05_optimizacion_avanzada.ipynb`.
 
+- `feat(05)`: optimización avanzada autocontenida (GridSearchCV + SHAP + diagnóstico de residuales),
+  cargando el parquet del 02; figuras a `data/figuras/` (no versionada).
+
+Pendiente: PR contra `main`, verificación en Codespaces y merge `--no-ff`.
+
+---
+
+## [Merged] — Punto 4: Validación metodológica
+
+### Rama `feature/04-validacion-metodologica` → `main` (PR #4, merge `--no-ff` en `2462946`)
 - `feat(04)`: notebook de validación metodológica con verificación de integración del pipeline
   `00→01→02→03` y los tres problemas metodológicos (P1 Gini, P2 ground truth, P3 outliers por tipo).
-
-Pendiente: PR contra `main`, verificación de integración en Codespaces y merge `--no-ff`.
 
 ---
 
