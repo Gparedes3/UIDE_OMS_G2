@@ -2,6 +2,19 @@
 
 Registro general del avance del proyecto.
 
+## Alineación del contrato de datos y explicabilidad del modelo
+
+- `01` y `02`: filtrado de agregados regionales robusto a `region == ''` y `region == 'NA'`.
+- `02`: salida canónica `data/processed/dataset_modelado.parquet` más particiones
+  `train_processed.parquet` / `test_processed.parquet` sin países solapados.
+- `02`: creación explícita de `is_pandemic` para 2020-2021.
+- `03`, `04`, `05` y `06`: contrato explícito de features; el modelo usa las versiones log de PIB
+  per cápita y población, y falla si reaparece la columna vacía `region_`.
+- `03`: prueba de robustez con y sin 2020-2021 y conclusiones reescritas para explicar el modelo por
+  bloques de variables.
+- Notebooks oficiales `01`-`06`: salidas antiguas limpiadas para evitar métricas obsoletas tras el
+  cambio de pipeline.
+
 ## Modelado — resolución de conflictos y pipeline funcional (punto 3)
 
 - Auditoría inicial de los notebooks 00–04 y los conflictos detectados (`AUDITORIA.md`).
