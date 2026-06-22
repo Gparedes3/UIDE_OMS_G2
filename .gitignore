@@ -19,6 +19,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Herramientas/caché locales generadas para compilar artefactos
+.tools/
+.cache/
+
 # Jupyter
 .ipynb_checkpoints/
 

@@ -1,0 +1,173 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish, es-tabla]{babel}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{cite}
+\usepackage{url}
+
+\renewcommand{\IEEEkeywordsname}{Palabras clave}
+
+\title{Modelado supervisado de tasas brutas de mortalidad y natalidad a partir de indicadores socioeconomicos del Banco Mundial}
+
+\author{
+  \IEEEauthorblockN{Guillermo Paredes, Donato Oña, Mateo Villacreses, Karla Estefania Moras Cajas}
+  \IEEEauthorblockA{
+    Universidad Internacional del Ecuador (UIDE)\\
+    Ecuador\\
+    % TODO: reemplazar por correos institucionales si el formato TICEC los exige.
+    % guillermo.paredes@estudiantes.uide.edu.ec, donato.ona@estudiantes.uide.edu.ec,
+    % mateo.villacreses@estudiantes.uide.edu.ec, docente@uide.edu.ec
+  }
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este articulo presenta el desarrollo de un pipeline reproducible de ciencia de datos para modelar las tasas brutas de mortalidad y natalidad de paises del mundo entre 2000 y 2022, empleando indicadores socioeconomicos y demograficos del Banco Mundial. El problema se formula como una tarea de regresion supervisada con datos panel pais-año. La metodologia incluye adquisicion reproducible mediante \textit{wbgapi}, filtrado de agregados regionales, imputacion jerarquica de valores faltantes, enriquecimiento con estructura etaria, transformaciones logaritmicas, codificacion de variables categoricas y validacion cruzada agrupada por pais para evitar fuga de informacion. Se compararon cuatro familias de modelos: Ridge, Random Forest, XGBoost y LightGBM. En una ejecucion de referencia, XGBoost obtuvo el mejor desempeño para ambos objetivos, con $R^2$ aproximado de 0.526 para mortalidad y 0.964 para natalidad. El analisis muestra que la natalidad es altamente predecible, aunque parte de su desempeño se explica por una identidad demografica con el porcentaje de poblacion de 0 a 14 años. La mortalidad, por su parte, presenta un techo predictivo menor debido a su dependencia de estructura etaria, choques sanitarios, conflictos y variables institucionales no incluidas. Se discuten limitaciones metodologicas asociadas al coeficiente de Gini, la naturaleza modelada del \textit{ground truth} y el tratamiento de valores extremos por dominio.
+\end{abstract}
+
+\begin{IEEEkeywords}
+aprendizaje automatico, regresion supervisada, mortalidad, natalidad, Banco Mundial, datos panel, XGBoost, validacion cruzada agrupada
+\end{IEEEkeywords}
+
+\section{Introduccion}
+
+Las tasas brutas de mortalidad y natalidad constituyen indicadores esenciales para describir la dinamica demografica de una poblacion. Aunque ambos indicadores se expresan como eventos por cada 1.000 habitantes, responden a procesos sociales y biologicos distintos. La natalidad tiende a relacionarse con variables de desarrollo, urbanizacion, nivel de ingreso y estructura por edades. La mortalidad, en cambio, puede adoptar patrones no monotonos: paises de bajos ingresos pueden presentar alta mortalidad por causas evitables, mientras que paises de altos ingresos pueden mostrar tasas crudas elevadas debido al envejecimiento poblacional.
+
+El objetivo del proyecto es construir y evaluar modelos de aprendizaje automatico capaces de estimar las tasas brutas de mortalidad y natalidad a partir de indicadores socioeconomicos y demograficos del Banco Mundial. La pregunta de investigacion que guia el trabajo es: \textit{en que medida los indicadores socioeconomicos, complementados con estructura etaria, permiten predecir las tasas brutas de mortalidad y natalidad de paises no observados durante el entrenamiento}.
+
+Se plantea como hipotesis que los modelos no lineales basados en arboles superan a una linea base lineal, especialmente en la prediccion de mortalidad, debido a la relacion no monotona entre desarrollo, envejecimiento y mortalidad cruda. Para natalidad se espera un desempeño superior, aunque se anticipa que parte de la capacidad predictiva proviene de variables de estructura etaria, particularmente el porcentaje de poblacion entre 0 y 14 años.
+
+La contribucion principal del trabajo es doble. Primero, se implementa un pipeline reproducible, documentado y verificable para adquisicion, preprocesamiento, modelado y validacion. Segundo, se ofrece una lectura metodologica critica de los resultados, evitando interpretar la importancia de variables como causalidad y explicando las limitaciones de los datos de origen.
+
+\section{Trabajos relacionados}
+
+El uso de modelos de regresion supervisada en datos tabulares es una practica ampliamente extendida en problemas socioeconomicos. Ridge Regression representa una linea base lineal regularizada que permite controlar varianza y multicolinealidad \cite{hoerl1970ridge}. Random Forest introduce ensambles de arboles mediante agregacion de modelos entrenados sobre subconjuntos de datos \cite{breiman2001random}. XGBoost y LightGBM son metodos de \textit{gradient boosting} diseñados para capturar interacciones no lineales con alto desempeño en datos tabulares \cite{chen2016xgboost,ke2017lightgbm}.
+
+En cuanto a interpretabilidad, las importancias por permutacion y los valores SHAP permiten analizar la contribucion predictiva de las variables sin asumir linealidad \cite{lundberg2017shap}. Sin embargo, estas tecnicas deben interpretarse con cautela: cuantifican utilidad predictiva, no relaciones causales. En proyectos aplicados, la documentacion del uso previsto, los datos, las metricas y las limitaciones resulta fundamental; por ello, el reporte final incorpora una tarjeta de modelo inspirada en practicas de transparencia en aprendizaje automatico \cite{mitchell2019modelcards}.
+
+\section{Materiales y metodos}
+
+\subsection{Fuente de datos}
+
+Los datos provienen de World Bank Open Data y World Development Indicators \cite{worldbank2024wdi}. La adquisicion se realiza mediante la libreria \textit{wbgapi}, lo que permite reconstruir el dataset sin versionar archivos pesados. El periodo de analisis comprende los años 2000 a 2022. La unidad de observacion es el par pais-año.
+
+El dataset original de la API incluye paises individuales y agregados regionales, como ``World'', ``European Union'' o regiones continentales. Estos agregados se excluyen porque no representan unidades nacionales comparables. El pipeline filtra entidades con region vacia o no clasificada, evitando que el modelo aprenda patrones mezclados entre paises y agregados.
+
+\subsection{Variables}
+
+Las variables objetivo son \texttt{death\_rate} y \texttt{birth\_rate}, ambas medidas como eventos por cada 1.000 habitantes. Los predictores combinan dimensiones economicas, sociales, demograficas y contextuales. La Tabla~\ref{tab:variables} resume el contrato de datos usado por el modelo.
+
+\begin{table}[htbp]
+\caption{Variables principales del modelo}
+\label{tab:variables}
+\centering
+\begin{tabular}{p{0.30\linewidth}p{0.58\linewidth}}
+\toprule
+\textbf{Grupo} & \textbf{Variables} \\
+\midrule
+Objetivos & tasa bruta de mortalidad, tasa bruta de natalidad \\
+Economicas & crecimiento del PIB, PIB per capita logaritmico, Gini, desempleo \\
+Sociales & gasto en salud, gasto en educacion, urbanizacion \\
+Demograficas & poblacion logaritmica, poblacion de 65+ años, poblacion de 0--14 años \\
+Contextuales & region, nivel de ingreso, año normalizado, bandera 2020--2021 \\
+Trazabilidad & bandera de imputacion del Gini \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Preprocesamiento}
+
+El preprocesamiento se diseño para preservar la trazabilidad del dato y reducir decisiones arbitrarias. Primero, se eliminan observaciones sin alguna variable objetivo, ya que no pueden emplearse en entrenamiento supervisado. Luego se aplica imputacion jerarquica a los predictores: \textit{forward-fill} por pais, \textit{backward-fill} por pais, mediana por region y nivel de ingreso, mediana regional y mediana global. Para el coeficiente de Gini se crea \texttt{gini\_imputed}, debido a su alta proporcion de valores faltantes.
+
+El PIB per capita y la poblacion total presentan distribuciones sesgadas a la derecha, por lo que se transforman mediante \(\log(1+x)\). La region se codifica con variables \textit{one-hot}, mientras que el nivel de ingreso se codifica ordinalmente de acuerdo con la jerarquia LIC, LMC, UMC y HIC. El año se normaliza al intervalo \([0,1]\), y se añade \texttt{is\_pandemic} para identificar 2020 y 2021 como años de choque global.
+
+El notebook de preprocesamiento genera tres artefactos: un dataset completo \texttt{dataset\_modelado.parquet}, una particion de entrenamiento \texttt{train\_processed.parquet} y una particion de prueba \texttt{test\_processed.parquet}. La particion se realiza por pais para impedir que años de un mismo pais aparezcan simultaneamente en entrenamiento y prueba.
+
+\subsection{Modelos evaluados}
+
+Se evaluaron cuatro modelos de regresion: Ridge, Random Forest, XGBoost y LightGBM. La evaluacion principal usa \texttt{GroupKFold} con cinco pliegues, agrupando por codigo de pais. Este esquema responde a la pregunta de generalizacion hacia paises no observados, y evita fuga de informacion en datos panel.
+
+Las metricas usadas son RMSE, MAE y \(R^2\). RMSE se reporta en las mismas unidades del objetivo, MAE ofrece una medida robusta de error absoluto promedio, y \(R^2\) permite comparar la proporcion de varianza explicada.
+
+\section{Resultados}
+
+\subsection{Comparacion de modelos}
+
+La Tabla~\ref{tab:modelos} resume una ejecucion de referencia del pipeline de modelado. XGBoost obtuvo el menor RMSE para ambos objetivos. En natalidad el desempeño fue alto, con \(R^2 \approx 0.964\), mientras que en mortalidad el \(R^2\) fue moderado, aproximadamente 0.526. Esta diferencia respalda la hipotesis inicial: la mortalidad cruda es mas dificil de aproximar porque combina condiciones de desarrollo con envejecimiento y choques especificos de cada pais.
+
+% TODO: tras ejecutar nuevamente 00--06, actualizar esta tabla si las metricas cambian.
+\begin{table*}[htbp]
+\caption{Desempeño de modelos en validacion cruzada agrupada por pais}
+\label{tab:modelos}
+\centering
+\begin{tabular}{llccc}
+\toprule
+\textbf{Target} & \textbf{Modelo} & \textbf{RMSE} & \textbf{MAE} & \(\mathbf{R^2}\) \\
+\midrule
+\texttt{death\_rate} & Ridge & 2.320 & 1.576 & 0.502 \\
+\texttt{death\_rate} & Random Forest & 2.393 & 1.442 & 0.469 \\
+\texttt{death\_rate} & XGBoost & \textbf{2.252} & \textbf{1.358} & \textbf{0.526} \\
+\texttt{death\_rate} & LightGBM & 2.274 & 1.374 & 0.519 \\
+\midrule
+\texttt{birth\_rate} & Ridge & 2.479 & 1.860 & 0.947 \\
+\texttt{birth\_rate} & Random Forest & 2.175 & 1.517 & 0.959 \\
+\texttt{birth\_rate} & XGBoost & \textbf{2.061} & \textbf{1.436} & \textbf{0.964} \\
+\texttt{birth\_rate} & LightGBM & 2.077 & 1.448 & 0.963 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Ablacion de estructura etaria}
+
+Para distinguir señal socioeconomica de identidad demografica, se entreno XGBoost con y sin las variables \texttt{pop\_0to14\_pct} y \texttt{pop\_65plus\_pct}. La Tabla~\ref{tab:ablacion} muestra que eliminar estructura etaria afecta ambos objetivos, pero especialmente la natalidad. El \(R^2\) de natalidad cae de 0.964 a 0.809, lo que confirma que el alto desempeño no debe interpretarse como una explicacion puramente socioeconomica. En mortalidad, la caida de 0.526 a 0.320 evidencia que el envejecimiento poblacional es un componente central para explicar la tasa cruda.
+
+\begin{table*}[htbp]
+\caption{Ablacion de variables de estructura etaria con XGBoost}
+\label{tab:ablacion}
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Target} & \textbf{Features} & \textbf{RMSE} & \(\mathbf{R^2}\) \\
+\midrule
+\texttt{death\_rate} & con edad & 2.252 & 0.526 \\
+\texttt{death\_rate} & sin edad & 2.698 & 0.320 \\
+\texttt{birth\_rate} & con edad & 2.061 & 0.964 \\
+\texttt{birth\_rate} & sin edad & 4.661 & 0.809 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Importancia de variables}
+
+La importancia por permutacion sugiere que \texttt{pop\_0to14\_pct} domina la prediccion de natalidad, seguida por estructura etaria complementaria y variables temporales. Para mortalidad, \texttt{pop\_65plus\_pct} y el PIB per capita logaritmico aparecen entre las variables mas informativas. Esta lectura es coherente con la demografia: la natalidad reciente queda reflejada en la proporcion de menores, mientras que la mortalidad cruda aumenta en poblaciones envejecidas, incluso en paises de altos ingresos.
+
+\section{Discusion}
+
+Los resultados muestran que la formulacion del problema como regresion supervisada es adecuada, pero tambien revelan diferencias sustantivas entre los dos objetivos. La natalidad es altamente predecible porque varios indicadores capturan de forma directa o indirecta el regimen demografico de un pais. Sin embargo, la fuerte relacion con \texttt{pop\_0to14\_pct} obliga a comunicar el resultado con cuidado: el modelo no descubre solamente una relacion causal entre desarrollo y natalidad, sino que explota una variable que resume nacimientos recientes.
+
+La mortalidad presenta mayor complejidad. El \(R^2\) moderado no necesariamente implica un modelo deficiente; mas bien refleja que la tasa bruta de mortalidad depende de factores no incluidos en el dataset, como conflictos, epidemias, violencia, calidad institucional, cobertura sanitaria, vacunacion, registro civil y eventos extremos. Los residuales mas grandes, segun el analisis del notebook de modelado, tienden a concentrarse en paises o años con dinamicas atipicas, lo que sugiere que la inclusion de variables institucionales y sanitarias podria mejorar el desempeño.
+
+Existen tres consideraciones metodologicas centrales. Primero, el indicador de Gini usado por el Banco Mundial mide desigualdad de ingresos o consumo, no desigualdad sanitaria, de genero ni de acceso a servicios. Segundo, las tasas demograficas publicadas por organismos internacionales no son registros civiles crudos homogeneos, sino estimaciones modeladas a partir de censos, encuestas y sistemas de registro de calidad variable. Tercero, los valores extremos deben analizarse por dominio: una natalidad alta puede ser plausible, una recesion economica puede producir crecimiento negativo valido, y una poblacion muy grande no debe eliminarse como error por criterios IQR uniformes.
+
+\section{Conclusiones}
+
+El proyecto implemento un pipeline reproducible para modelar tasas brutas de mortalidad y natalidad con datos del Banco Mundial. La validacion agrupada por pais permite evaluar generalizacion hacia paises no observados, reduciendo fuga de informacion propia de datos panel.
+
+Los resultados respaldan parcialmente la hipotesis planteada. Los modelos no lineales, en particular XGBoost, ofrecen el mejor desempeño global. La mejora es mas relevante en mortalidad, donde la relacion con el desarrollo es no lineal y esta mediada por estructura etaria. La natalidad alcanza valores altos de \(R^2\), aunque su interpretacion debe matizarse por la influencia de la estructura etaria, especialmente el porcentaje de poblacion de 0 a 14 años.
+
+Como trabajo futuro se recomienda incorporar variables de gobernanza, capacidad sanitaria, violencia, conflicto, vacunacion y calidad del registro civil. Tambien seria pertinente evaluar una particion temporal si el objetivo cambia de comparacion entre paises a proyeccion demografica. Finalmente, se recomienda profundizar el analisis SHAP por region y nivel de ingreso para explicar heterogeneidad local en las predicciones.
+
+\section*{Agradecimientos}
+
+Los autores agradecen a la Universidad Internacional del Ecuador por el espacio academico para el desarrollo del proyecto interdisciplinario. Se agradece tambien a la docente coautora por su acompañamiento metodologico durante el proceso de investigacion.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
